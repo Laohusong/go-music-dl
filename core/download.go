@@ -75,7 +75,7 @@ func DownloadSongDataWithTemplate(song *model.Song, withCover bool, withLyrics b
 
 	finalData := audioData
 	warning := ""
-	if (ext == "mp3" || ext == "flac" || ext == "m4a" || ext == "wma") && (normalized.Album != "" || lyric != "" || len(coverData) > 0) {
+	if (ext == "mp3" || ext == "flac" || ext == "m4a" || ext == "wma" || ext == "ogg") && (normalized.Album != "" || lyric != "" || len(coverData) > 0) {
 		embeddedData, embedErr := EmbedSongMetadata(audioData, &normalized, lyric, coverData, coverMime)
 		switch {
 		case embedErr == nil:

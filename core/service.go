@@ -1653,7 +1653,7 @@ func EmbedSongMetadata(audioData []byte, song *model.Song, lyric string, coverDa
 	if song != nil && song.Ext != "" {
 		songExt := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(song.Ext, ".")))
 		switch songExt {
-		case "mp3", "flac", "m4a", "wma":
+		case "mp3", "flac", "m4a", "wma", "ogg":
 			ext = songExt
 		}
 	}
@@ -1683,7 +1683,7 @@ func EmbedSongMetadata(audioData []byte, song *model.Song, lyric string, coverDa
 		if existingLyric := strings.TrimSpace(existing.Lyrics()); lyric == "" && existingLyric != "" {
 			lyric = existingLyric
 		}
-		if ext == "mp3" && !incomingCover {
+		if (ext == "mp3" || ext == "ogg") && !incomingCover {
 			if picture := existing.Picture(); picture != nil && len(picture.Data) > 0 {
 				coverData = append([]byte(nil), picture.Data...)
 				if picture.MIMEType != "" {
@@ -1695,7 +1695,7 @@ func EmbedSongMetadata(audioData []byte, song *model.Song, lyric string, coverDa
 
 	lyric = LineSyncedLyrics(lyric)
 
-	if ext != "mp3" && ext != "flac" && ext != "m4a" && ext != "wma" {
+	if ext != "mp3" && ext != "flac" && ext != "m4a" && ext != "wma" && ext != "ogg" {
 		return audioData, nil
 	}
 	if title == "" && artist == "" && album == "" && lyric == "" && len(coverData) == 0 {
@@ -1739,7 +1739,14 @@ func embedAudioMetadataByFFmpeg(audioData []byte, ext, title, artist, album, lyr
 
 	hasCover := len(coverData) > 0
 	coverPath := ""
-	if hasCover {
+	if hasCover && ext == "ogg" {
+		coverPath, err = createOggCoverMetadataFile(coverData, coverMime)
+		if err != nil {
+			return nil, err
+		}
+		defer os.Remove(coverPath)
+		args = append(args, "-f", "ffmetadata", "-i", coverPath)
+	} else if hasCover {
 		coverExt := ".jpg"
 		if strings.Contains(coverMime, "png") {
 			coverExt = ".png"
@@ -1758,31 +1765,43 @@ func embedAudioMetadataByFFmpeg(audioData []byte, ext, title, artist, album, lyr
 		args = append(args, "-i", coverPath)
 	}
 
-	if hasCover {
+	if ext == "ogg" {
+		// Ogg stores artwork in Vorbis comments, not a video attachment.
+		args = append(args, "-map", "0:a:0")
+	} else if hasCover {
 		args = append(args, "-map", "0:a:0", "-map", "1:v:0")
 	} else {
 		args = append(args, "-map", "0")
 	}
 	args = append(args, "-map_metadata", "0")
+	if hasCover && ext == "ogg" {
+		args = append(args, "-map_metadata", "1")
+	}
 
-	if hasCover {
+	if hasCover && ext != "ogg" {
 		args = append(args, "-c:a", "copy")
 		args = append(args, "-c:v", "copy", "-disposition:v:0", "attached_pic", "-metadata:s:v:0", "title=Album cover", "-metadata:s:v:0", "comment=Cover (front)")
 	} else {
 		args = append(args, "-c", "copy")
 	}
 
+	metadataOption := "-metadata"
+	if ext == "ogg" {
+		// Vorbis comments belong to the audio stream; global tags do not
+		// override an existing stream title or existing embedded lyrics.
+		metadataOption = "-metadata:s:a:0"
+	}
 	if title != "" {
-		args = append(args, "-metadata", "title="+title)
+		args = append(args, metadataOption, "title="+title)
 	}
 	if artist != "" {
-		args = append(args, "-metadata", "artist="+artist)
+		args = append(args, metadataOption, "artist="+artist)
 	}
 	if album != "" {
-		args = append(args, "-metadata", "album="+album)
+		args = append(args, metadataOption, "album="+album)
 	}
 	if lyric != "" {
-		args = append(args, "-metadata", "lyrics="+lyric)
+		args = append(args, metadataOption, "lyrics="+lyric)
 	}
 
 	if ext == "mp3" {
