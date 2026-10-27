@@ -1698,7 +1698,11 @@ func serveLocalMusicLyric(c *gin.Context, song *model.Song, download bool, saveL
 		return
 	}
 
-	lyrics = formatLyricForMode(lyrics, c.DefaultQuery("format", "auto"))
+	if download {
+		lyrics = core.LineSyncedLyrics(lyrics)
+	} else {
+		lyrics = formatLyricForMode(lyrics, c.DefaultQuery("format", "auto"))
+	}
 	c.Header("X-Lyric-Format", classifyLyricFormat(lyrics))
 	if download {
 		if len(saveLocal) > 0 && saveLocal[0] {

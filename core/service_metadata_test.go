@@ -56,6 +56,42 @@ func TestEmbedSongMetadataWritesReadableMP3ID3v23LyricsAndCover(t *testing.T) {
 	}
 }
 
+func TestEmbedSongMetadataConvertsWordLyricsToLineLyrics(t *testing.T) {
+	for _, ext := range []string{"mp3", "flac"} {
+		t.Run(ext, func(t *testing.T) {
+			audio := []byte{0xff, 0xfb, 0x90, 0x64, 0, 0, 0, 0}
+			if ext == "flac" {
+				if _, err := exec.LookPath("ffmpeg"); err != nil {
+					t.Skip("ffmpeg not available")
+				}
+				path := filepath.Join(t.TempDir(), "test.flac")
+				cmd := exec.Command("ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "anullsrc=r=8000:cl=mono", "-t", "0.05", path)
+				if out, err := cmd.CombinedOutput(); err != nil {
+					t.Fatalf("generate FLAC: %v: %s", err, out)
+				}
+				var err error
+				audio, err = os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			const raw = "[00:01.00]你[00:01.50]好[00:02.00]\n[00:03.000]<00:03.000>世界<00:04.000>"
+			const want = "[00:01.00]你好\n[00:03.000]世界"
+			data, err := EmbedSongMetadata(audio, &model.Song{Name: "测试", Ext: ext}, raw, nil, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			metadata, err := tag.ReadFrom(bytes.NewReader(data))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if metadata.Lyrics() != want {
+				t.Fatalf("embedded lyric = %q, want %q", metadata.Lyrics(), want)
+			}
+		})
+	}
+}
+
 func TestEmbedSongMetadataReplacesExistingMP3ID3Tag(t *testing.T) {
 	audioData := []byte{0xff, 0xfb, 0x90, 0x64}
 	first, err := EmbedSongMetadata(audioData, &model.Song{Name: "旧歌", Artist: "旧歌手", Album: "旧专辑", Ext: "mp3"}, "旧歌词", nil, "")

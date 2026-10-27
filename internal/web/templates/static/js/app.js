@@ -1119,7 +1119,7 @@ function lyricURLsForSong(song) {
   return {
     line: buildLyricRequestURL(song, "lyric", "line"),
     auto: buildLyricRequestURL(song, "lyric", "auto"),
-    download: buildLyricRequestURL(song, "download_lrc", "auto"),
+    download: buildLyricRequestURL(song, "download_lrc", "line"),
   };
 }
 

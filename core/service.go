@@ -1693,6 +1693,8 @@ func EmbedSongMetadata(audioData []byte, song *model.Song, lyric string, coverDa
 		}
 	}
 
+	lyric = LineSyncedLyrics(lyric)
+
 	if ext != "mp3" && ext != "flac" && ext != "m4a" && ext != "wma" {
 		return audioData, nil
 	}

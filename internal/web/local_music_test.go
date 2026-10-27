@@ -502,6 +502,31 @@ func TestLocalMusicSidecarCoverAndLyricFallbacks(t *testing.T) {
 	}
 }
 
+func TestLocalLyricDownloadUsesLineTimingAndPlaybackKeepsWordTiming(t *testing.T) {
+	initCollectionDBForTest(t)
+	dir := t.TempDir()
+	withLocalMusicDownloadDir(t, dir)
+	if err := os.WriteFile(filepath.Join(dir, "test.mp3"), []byte("test audio"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	const raw = "[00:01.00]你[00:01.50]好[00:02.00]"
+	if err := os.WriteFile(filepath.Join(dir, "test.lrc"), []byte(raw), 0644); err != nil {
+		t.Fatal(err)
+	}
+	router := newLocalMusicTestRouter()
+	for _, tc := range []struct{ endpoint, want string }{
+		{"download_lrc", "[00:01.00]你好"},
+		{"lyric", raw},
+	} {
+		rec := httptest.NewRecorder()
+		path := RoutePrefix + "/" + tc.endpoint + "?source=local&id=" + url.QueryEscape(encodeLocalMusicID("test.mp3"))
+		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK || rec.Body.String() != tc.want {
+			t.Fatalf("%s: status %d, lyric %q, want %q", tc.endpoint, rec.Code, rec.Body.String(), tc.want)
+		}
+	}
+}
+
 func TestLocalMusicListIncludesEmbeddedCover(t *testing.T) {
 	initCollectionDBForTest(t)
 

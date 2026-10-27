@@ -1428,7 +1428,7 @@ func RegisterMusicRoutes(api, configAPI *gin.RouterGroup) {
 			c.String(404, "Lyric not found")
 			return
 		}
-		lrc = formatLyricForMode(lrc, c.DefaultQuery("format", "auto"))
+		lrc = core.LineSyncedLyrics(lrc)
 		c.Header("X-Lyric-Format", classifyLyricFormat(lrc))
 
 		filename := fmt.Sprintf("%s - %s.lrc", name, artist)
